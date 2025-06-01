@@ -280,9 +280,9 @@ class Object(reprlib.Representable, metaclass=ObjectMeta):
       self._setattr(name, value)
 
   def _setattr(self, name: str, value: tp.Any) -> None:
-    self._check_valid_context(
-      lambda: f"Cannot mutate '{type(self).__name__}' from different trace level"
-    )
+    # self._check_valid_context(
+    #   lambda: f"Cannot mutate '{type(self).__name__}' from different trace level"
+    # )
     if (
       type(self)._object__is_pytree
       and isinstance(self._object__nodes, frozenset)

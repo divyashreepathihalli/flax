@@ -194,9 +194,9 @@ class Object(reprlib.Representable, metaclass=ObjectMeta):
       self._setattr(name, value)
 
   def _setattr(self, name: str, value: tp.Any) -> None:
-    self._check_valid_context(
-      lambda: f"Cannot mutate '{type(self).__name__}' from different trace level"
-    )
+    # self._check_valid_context(
+    #   lambda: f"Cannot mutate '{type(self).__name__}' from different trace level"
+    # )
     object.__setattr__(self, name, value)
 
   def _check_valid_context(self, error_msg: tp.Callable[[], str]) -> None:

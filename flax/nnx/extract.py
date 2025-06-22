@@ -45,7 +45,8 @@ def check_consistent_aliasing(
   prefix: tp.Any,
   /,
   *,
-  node_prefixes: dict[tp.Any, list[tuple[PathParts, tp.Any]]] | None = None,
+  node_prefixes: dict[int, tuple[tp.Any, list[tuple[PathParts, tp.Any]]]]
+  | None = None,
 ):
   if node_prefixes is None:
     node_prefixes = {}

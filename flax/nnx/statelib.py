@@ -257,13 +257,30 @@ class State(MutableMapping[K, V], reprlib.Representable):
     return key in self._mapping
 
   def __getitem__(self, key: K) -> State | V:  # type: ignore
-    value = self._mapping[key]
-    if isinstance(value, tp.Mapping):
-      return type(self)(value, _copy=False)
-    return value
+    if key in self._mapping:
+      value = self._mapping[key]
+      if isinstance(value, tp.Mapping):
+        return type(self)(value, _copy=False)
+      return value
+    else:
+      # Check if key is part of a flat path
+      flat_state_items = []
+      for path, value in to_flat_state(self):
+        if path and path[0] == key:
+          flat_state_items.append((path[1:], value))
+      if flat_state_items:
+        return from_flat_state(flat_state_items)
+      raise KeyError(f"No key '{key}' in State")
 
   def __getattr__(self, key: K) -> State | V:  # type: ignore[misc]
     if '_mapping' not in vars(self) or key not in self._mapping:
+      # Check if key is part of a flat path
+      flat_state_items = []
+      for path, value in to_flat_state(self):
+        if path and path[0] == key:
+          flat_state_items.append((path[1:], value))
+      if flat_state_items:
+        return from_flat_state(flat_state_items)
       raise AttributeError(f"No attribute '{key}' in State")
     return self[key]
 

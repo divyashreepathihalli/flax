@@ -92,6 +92,42 @@ class StateTest(absltest.TestCase):
     nnx.update(module, state)
     assert jnp.array_equal(module(jnp.ones((3, 4))), jnp.zeros((3, 5)))
 
+  def test_state_getattr_getitem_flat_path(self):
+    # Import pytest here to avoid making it a global dependency for all tests
+    import pytest
+
+    flat_state_items = [
+        (('a', 'b'), 1),
+        (('a', 'c', 'd'), 2),
+        (('e',), 3),
+    ]
+    # Create a new State from the FlatState to simulate the scenario
+    state = nnx.from_flat_state(flat_state_items)
+
+    # Test __getattr__
+    assert state.a.b == 1
+    assert state.a.c.d == 2
+    assert state.e == 3
+
+    # Test __getitem__
+    assert state['a']['b'] == 1
+    assert state['a']['c']['d'] == 2
+    assert state['e'] == 3
+
+    # Test mixed access
+    assert state.a['c'].d == 2
+    assert state['a'].c['d'] == 2
+
+    # Test errors
+    with pytest.raises(AttributeError, match="No attribute 'x' in State"):
+      _ = state.x
+    with pytest.raises(KeyError, match="No key 'x' in State"):
+      _ = state['x']
+    with pytest.raises(AttributeError, match="No attribute 'y' in State"):
+      _ = state.a.y
+    with pytest.raises(KeyError, match="No key 'y' in State"):
+      _ = state.a['y']
+
 
 if __name__ == '__main__':
   absltest.main()

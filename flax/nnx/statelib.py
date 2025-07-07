@@ -257,15 +257,40 @@ class State(MutableMapping[K, V], reprlib.Representable):
     return key in self._mapping
 
   def __getitem__(self, key: K) -> State | V:  # type: ignore
-    value = self._mapping[key]
-    if isinstance(value, tp.Mapping):
-      return type(self)(value, _copy=False)
-    return value
+        if key in self._mapping:
+            value = self._mapping[key]
+            if isinstance(value, tp.Mapping):
+                return type(self)(value, _copy=False)
+            return value
+        # Support index-based access for nested list structures (e.g., layers)
+        if isinstance(key, (int, str)):
+            sub_flat: dict[PathParts, V] = {}
+            for full_key, val in self._mapping.items():
+                if isinstance(full_key, tuple) and len(full_key) > 0 and full_key[0] == key:
+                    new_subkey = full_key[1:] if len(full_key) > 1 else ()
+                    sub_flat[new_subkey] = val
+            if sub_flat:
+                nested_map = traversals.unflatten_mapping(sub_flat)
+                return type(self)(nested_map, _copy=False)
+        raise KeyError(f"{key}")
 
   def __getattr__(self, key: K) -> State | V:  # type: ignore[misc]
-    if '_mapping' not in vars(self) or key not in self._mapping:
-      raise AttributeError(f"No attribute '{key}' in State")
-    return self[key]
+        # If the mapping is not yet initialized or key is directly present, fall back to default behavior
+        if '_mapping' not in vars(self):
+            raise AttributeError(f"No attribute '{key}' in State")
+        if key in self._mapping:
+            return self[key]
+        # Support nested access: if key is the first part of any tuple path in _mapping, build a substate
+        sub_flat: dict[PathParts, V] = {}
+        for full_key, val in self._mapping.items():
+            if isinstance(full_key, tuple) and len(full_key) > 0 and full_key[0] == key:
+                new_subkey = full_key[1:] if len(full_key) > 1 else ()
+                sub_flat[new_subkey] = val
+        if sub_flat:
+            # Reconstruct a nested mapping for this key prefix and return as State
+            nested_map = traversals.unflatten_mapping(sub_flat)
+            return type(self)(nested_map, _copy=False)
+        raise AttributeError(f"No attribute '{key}' in State")
 
   def __setitem__(self, key: K, value: State | V) -> None:
     if key == '__orig_class__':

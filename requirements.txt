@@ -1,0 +1,6 @@
+flax>=0.10.0
+jax>=0.6.0
+jaxlib>=0.6.0
+optax>=0.2.0
+numpy>=1.23.0
+matplotlib>=3.5.0 

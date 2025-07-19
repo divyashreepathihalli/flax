@@ -264,6 +264,9 @@ class ToLinen(linen.Module):
       NNX module.
     skip_rng: True if this NNX module doesn't need `rngs` arg during
       initialization (not common).
+    abstract_init: if True (default) the NNX module will be initialized under
+      `nnx.eval_shape`, useful to minimize memory consumption, else it will be
+      initialized normally.
 
   Returns:
     A stateful NNX module that behaves the same as the wrapped Linen module.
@@ -272,7 +275,8 @@ class ToLinen(linen.Module):
   args: tp.Sequence = ()
   kwargs: tp.Mapping[str, tp.Any] = FrozenDict({})
   skip_rng: bool = False
-  metadata_fn: tp.Callable[[variablelib.VariableState], tp.Any] | None = (
+  abstract_init: bool = True
+  metadata_fn: tp.Callable[[variablelib.Variable], tp.Any] | None = (
       bv.to_linen_var
   )
 
@@ -311,9 +315,12 @@ class ToLinen(linen.Module):
       states = ({},)
 
     # update module state
-    module = nnx.eval_shape(
-        lambda: self.nnx_class(*self.args, **_module_kwargs())
-    )
+    if self.abstract_init:
+      module = nnx.eval_shape(
+          lambda: self.nnx_class(*self.args, **_module_kwargs())
+      )
+    else:
+      module = self.nnx_class(*self.args, **_module_kwargs())
     nnx.update(module, *states)
     nnx.reseed(
         module, **linen_rngs_dict(self, add_default=maybe_add_default)
@@ -342,7 +349,7 @@ class ToLinen(linen.Module):
 
     # group state by collection
     for path, leaf in nnx.to_flat_state(state):
-      type_ = leaf.type if isinstance(leaf, nnx.VariableState) else type(leaf)
+      type_ = type(leaf)
       collection = variablelib.variable_name_from_type(
           type_, allow_register=True
       )
@@ -355,7 +362,7 @@ class ToLinen(linen.Module):
       if self.is_mutable_collection(collection):
 
         def _to_linen_var(x):
-          if isinstance(x, nnx.VariableState):
+          if isinstance(x, nnx.Variable):
             if self.metadata_fn:
               return self.metadata_fn(x)
             else:
@@ -366,7 +373,7 @@ class ToLinen(linen.Module):
         collection_state = jax.tree.map(
             _to_linen_var,
             collection_state,
-            is_leaf=lambda x: isinstance(x, nnx.VariableState),
+            is_leaf=lambda x: isinstance(x, nnx.Variable),
         )
         for k, v in collection_state.items():
           self.put_variable(collection, k, v)
@@ -376,9 +383,11 @@ def to_linen(
     nnx_class: tp.Callable[..., Module],
     *args,
     metadata_fn: (
-        tp.Callable[[variablelib.VariableState], tp.Any] | None
+        tp.Callable[[variablelib.Variable], tp.Any] | None
     ) = bv.to_linen_var,
     name: str | None = None,
+    skip_rng: bool = False,
+    abstract_init: bool = True,
     **kwargs,
 ):
   """Shortcut of `nnx.bridge.ToLinen` if user is not changing any of its default fields."""
@@ -387,5 +396,7 @@ def to_linen(
       args=args,
       kwargs=FrozenDict(kwargs),
       metadata_fn=metadata_fn,
+      skip_rng=skip_rng,
+      abstract_init=abstract_init,
       name=name,
   )
